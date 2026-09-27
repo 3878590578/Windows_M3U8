@@ -1,12 +1,14 @@
 package com.m3u8.extractor;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Html;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -18,10 +20,9 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,16 +34,31 @@ import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
 
+    // =========================================================
+    // 网站
+    // =========================================================
+
     private static final String BASE_URL = "https://dyttzy.tv";
+
+    // =========================================================
+    // UI
+    // =========================================================
 
     private EditText keywordEdit;
     private Button searchButton;
     private TextView statusText;
     private LinearLayout resultLayout;
 
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Handler mainHandler =
+            new Handler(Looper.getMainLooper());
 
-    private final List<SearchItem> searchItems = new ArrayList<>();
+    // 保存最近一次搜索结果
+    private final List<SearchItem> searchItems =
+            new ArrayList<>();
+
+    // =========================================================
+    // Activity
+    // =========================================================
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,28 +68,67 @@ public class MainActivity extends Activity {
     }
 
     // =========================================================
-    // UI
+    // 创建界面
     // =========================================================
 
     private void buildUI() {
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(24, 24, 24, 24);
+        LinearLayout root =
+                new LinearLayout(this);
 
-        TextView title = new TextView(this);
+        root.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        root.setPadding(
+                24,
+                24,
+                24,
+                24
+        );
+
+        // -----------------------------------------------------
+        // 标题
+        // -----------------------------------------------------
+
+        TextView title =
+                new TextView(this);
+
         title.setText("M3U8 提取器");
+
         title.setTextSize(26);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 10, 0, 25);
+
+        title.setGravity(
+                Gravity.CENTER
+        );
+
+        title.setPadding(
+                0,
+                10,
+                0,
+                25
+        );
 
         root.addView(title);
 
-        LinearLayout searchRow = new LinearLayout(this);
-        searchRow.setOrientation(LinearLayout.HORIZONTAL);
+        // -----------------------------------------------------
+        // 搜索栏
+        // -----------------------------------------------------
 
-        keywordEdit = new EditText(this);
-        keywordEdit.setHint("输入影视名称");
+        LinearLayout searchRow =
+                new LinearLayout(this);
+
+        searchRow.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        keywordEdit =
+                new EditText(this);
+
+        keywordEdit.setHint(
+                "输入影视名称或关键词"
+        );
+
         keywordEdit.setSingleLine(true);
 
         LinearLayout.LayoutParams inputParams =
@@ -83,9 +138,14 @@ public class MainActivity extends Activity {
                         1
                 );
 
-        searchRow.addView(keywordEdit, inputParams);
+        searchRow.addView(
+                keywordEdit,
+                inputParams
+        );
 
-        searchButton = new Button(this);
+        searchButton =
+                new Button(this);
+
         searchButton.setText("搜索");
 
         searchRow.addView(
@@ -98,19 +158,45 @@ public class MainActivity extends Activity {
 
         root.addView(searchRow);
 
-        statusText = new TextView(this);
-        statusText.setText("请输入影视名称");
+        // -----------------------------------------------------
+        // 状态
+        // -----------------------------------------------------
+
+        statusText =
+                new TextView(this);
+
+        statusText.setText(
+                "请输入影视名称或关键词"
+        );
+
         statusText.setTextSize(16);
-        statusText.setPadding(0, 20, 0, 15);
+
+        statusText.setPadding(
+                0,
+                20,
+                0,
+                15
+        );
 
         root.addView(statusText);
 
-        ScrollView scrollView = new ScrollView(this);
+        // -----------------------------------------------------
+        // 结果滚动区域
+        // -----------------------------------------------------
 
-        resultLayout = new LinearLayout(this);
-        resultLayout.setOrientation(LinearLayout.VERTICAL);
+        ScrollView scrollView =
+                new ScrollView(this);
 
-        scrollView.addView(resultLayout);
+        resultLayout =
+                new LinearLayout(this);
+
+        resultLayout.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        scrollView.addView(
+                resultLayout
+        );
 
         root.addView(
                 scrollView,
@@ -123,23 +209,52 @@ public class MainActivity extends Activity {
 
         setContentView(root);
 
+        // -----------------------------------------------------
+        // 搜索按钮
+        // -----------------------------------------------------
+
         searchButton.setOnClickListener(v -> {
 
-            String keyword = keywordEdit.getText()
-                    .toString()
-                    .trim();
+            String keyword =
+                    keywordEdit
+                            .getText()
+                            .toString()
+                            .trim();
 
             if (keyword.isEmpty()) {
+
                 Toast.makeText(
-                        this,
-                        "请输入影视名称",
+                        MainActivity.this,
+                        "请输入影视名称或关键词",
                         Toast.LENGTH_SHORT
                 ).show();
+
                 return;
             }
 
             search(keyword);
         });
+
+        // 回车搜索
+        keywordEdit.setOnEditorActionListener(
+                (v, actionId, event) -> {
+
+                    String keyword =
+                            keywordEdit
+                                    .getText()
+                                    .toString()
+                                    .trim();
+
+                    if (!keyword.isEmpty()) {
+
+                        search(keyword);
+
+                        return true;
+                    }
+
+                    return false;
+                }
+        );
     }
 
     // =========================================================
@@ -150,7 +265,9 @@ public class MainActivity extends Activity {
 
         searchButton.setEnabled(false);
 
-        statusText.setText("正在搜索……");
+        statusText.setText(
+                "正在搜索：" + keyword
+        );
 
         resultLayout.removeAllViews();
 
@@ -166,12 +283,13 @@ public class MainActivity extends Activity {
                                 "UTF-8"
                         );
 
-                String url =
+                String searchUrl =
                         BASE_URL +
                         "/index.php/vod/search.html?wd=" +
                         encoded;
 
-                String html = get(url);
+                String html =
+                        get(searchUrl);
 
                 List<SearchItem> results =
                         parseSearchResults(html);
@@ -181,7 +299,10 @@ public class MainActivity extends Activity {
                     searchButton.setEnabled(true);
 
                     searchItems.clear();
-                    searchItems.addAll(results);
+
+                    searchItems.addAll(
+                            results
+                    );
 
                     if (results.isEmpty()) {
 
@@ -198,7 +319,9 @@ public class MainActivity extends Activity {
                             " 部影片"
                     );
 
-                    showSearchResults(results);
+                    showSearchResults(
+                            results
+                    );
                 });
 
             } catch (Exception e) {
@@ -209,7 +332,7 @@ public class MainActivity extends Activity {
 
                     statusText.setText(
                             "搜索失败：" +
-                            e.getMessage()
+                            safeError(e)
                     );
                 });
             }
@@ -221,28 +344,36 @@ public class MainActivity extends Activity {
     // 搜索结果解析
     // =========================================================
 
-    private List<SearchItem> parseSearchResults(String html) {
+    private List<SearchItem> parseSearchResults(
+            String html) {
 
         Map<String, SearchItem> unique =
                 new LinkedHashMap<>();
 
         /*
-         * 重点：
+         * 只提取 a 标签。
          *
-         * 不能：
+         * 最重要的限制：
          *
-         * <a href="...">所有文字</a>
+         * 必须包含 /vod/detail/
          *
-         * 全部拿来当结果。
+         * 这样：
          *
-         * 必须限制为 /vod/detail/
+         * 海外动漫
+         * 综艺片
+         * 大陆综艺
+         * 港台综艺
+         * 日韩综艺
+         *
+         * 这些分类页面不会被当成影片。
          */
 
-        Pattern pattern = Pattern.compile(
-                "<a[^>]+href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
-                Pattern.CASE_INSENSITIVE |
-                        Pattern.DOTALL
-        );
+        Pattern pattern =
+                Pattern.compile(
+                        "<a\\b[^>]*\\bhref\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
+                        Pattern.CASE_INSENSITIVE |
+                                Pattern.DOTALL
+                );
 
         Matcher matcher =
                 pattern.matcher(html);
@@ -259,128 +390,255 @@ public class MainActivity extends Activity {
                 continue;
             }
 
-            href = Html.fromHtml(href).toString().trim();
+            href =
+                    decodeHtml(
+                            href
+                    ).trim();
 
-            /*
-             * 只接受影片详情页
-             */
+            // -------------------------------------------------
+            // 只允许影片详情页
+            // -------------------------------------------------
 
             if (!isDetailUrl(href)) {
                 continue;
             }
 
-            String title =
+            // -------------------------------------------------
+            // 提取搜索结果显示的真实影片名称
+            //
+            // 注意：
+            // 这里绝对不能使用用户输入的 keyword
+            // -------------------------------------------------
+
+            String originalTitle =
                     extractText(body);
 
-            if (title.isEmpty()) {
+            if (originalTitle.isEmpty()) {
                 continue;
             }
 
-            /*
-             * 去掉一些页面无意义文字
-             */
+            // -------------------------------------------------
+            // 清理网站评分、完结状态、更新集数
+            // -------------------------------------------------
 
-            if (isBadTitle(title)) {
+            String cleanTitle =
+                    cleanMovieTitle(
+                            originalTitle
+                    );
+
+            if (cleanTitle.isEmpty()) {
                 continue;
             }
 
-            href = makeAbsoluteUrl(href);
+            // -------------------------------------------------
+            // 绝对 URL
+            // -------------------------------------------------
 
-            /*
-             * 去重
-             */
+            href =
+                    makeAbsoluteUrl(
+                            href
+                    );
 
-            if (!unique.containsKey(href)) {
+            // -------------------------------------------------
+            // 去重
+            // -------------------------------------------------
 
-                SearchItem item =
-                        new SearchItem();
-
-                item.title = title;
-                item.url = href;
-
-                unique.put(href, item);
+            if (unique.containsKey(href)) {
+                continue;
             }
+
+            SearchItem item =
+                    new SearchItem();
+
+            item.title =
+                    cleanTitle;
+
+            item.originalTitle =
+                    originalTitle;
+
+            item.url =
+                    href;
+
+            unique.put(
+                    href,
+                    item
+            );
         }
 
-        return new ArrayList<>(unique.values());
+        return new ArrayList<>(
+                unique.values()
+        );
     }
 
     // =========================================================
-    // 判断是不是详情页
+    // 判断详情页
     // =========================================================
 
-    private boolean isDetailUrl(String url) {
+    private boolean isDetailUrl(
+            String url) {
+
+        if (url == null) {
+            return false;
+        }
 
         String lower =
                 url.toLowerCase();
 
         /*
-         * 常见 MacCMS：
+         * 例如：
          *
          * /index.php/vod/detail/id/123.html
-         *
-         * /index.php/vod/detail/id-123.html
-         *
          * /vod/detail/id/123.html
          */
 
-        return lower.contains("/vod/detail/");
+        return lower.contains(
+                "/vod/detail/"
+        );
     }
 
     // =========================================================
-    // 排除分类/导航
+    // 清理影片名称
     // =========================================================
 
-    private boolean isBadTitle(String title) {
+    private String cleanMovieTitle(
+            String title) {
 
-        String t = title.trim();
-
-        if (t.length() < 1) {
-            return true;
+        if (title == null) {
+            return "";
         }
 
-        String[] bad = {
+        title =
+                decodeHtml(title)
+                        .trim();
 
-                "首页",
-                "电影",
-                "电视剧",
-                "综艺",
-                "动漫",
-                "海外动漫",
-                "国产动漫",
-                "日本动漫",
-                "欧美动漫",
-                "综艺片",
-                "大陆综艺",
-                "港台综艺",
-                "日韩综艺",
-                "欧美综艺",
-                "动作片",
-                "喜剧片",
-                "爱情片",
-                "科幻片",
-                "恐怖片",
-                "剧情片",
-                "战争片",
-                "记录片",
-                "动画片",
-                "伦理片",
-                "大陆剧",
-                "港剧",
-                "台剧",
-                "韩剧",
-                "日剧",
-                "欧美剧"
-        };
+        /*
+         * 统一空白
+         */
 
-        for (String s : bad) {
+        title =
+                title.replace(
+                        "\u00A0",
+                        " "
+                );
 
-            if (t.equals(s)) {
-                return true;
-            }
-        }
+        title =
+                title.replaceAll(
+                        "\\s+",
+                        " "
+                ).trim();
 
-        return false;
+        /*
+         * -----------------------------------------------------
+         * 1. 删除最前面的评分
+         *
+         * 例如：
+         *
+         * 0.0交锋2026已完结
+         * 9.5凡人修仙传更新至第150集
+         *
+         * ↓
+         *
+         * 交锋2026已完结
+         * 凡人修仙传更新至第150集
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "^\\s*\\d+(?:\\.\\d+)?\\s*",
+                        ""
+                );
+
+        /*
+         * -----------------------------------------------------
+         * 2. 删除末尾“已完结”
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "\\s*已完结\\s*$",
+                        ""
+                );
+
+        /*
+         * -----------------------------------------------------
+         * 3. 删除：
+         *
+         * 更新至第40集
+         * 更新至40集
+         * 更新至第40期
+         * 更新至40期
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "\\s*更新至\\s*第?\\s*\\d+\\s*[集期]\\s*$",
+                        ""
+                );
+
+        /*
+         * -----------------------------------------------------
+         * 4. 删除：
+         *
+         * 更新至20260927期
+         *
+         * 这个主要针对综艺。
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "\\s*更新至\\s*\\d{6,8}\\s*[集期]?\\s*$",
+                        ""
+                );
+
+        /*
+         * -----------------------------------------------------
+         * 5. 删除：
+         *
+         * 全40集
+         * 全 40 集
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "\\s*全\\s*\\d+\\s*[集期]\\s*$",
+                        ""
+                );
+
+        /*
+         * -----------------------------------------------------
+         * 6. 删除结尾孤立的“第40集”
+         *
+         * 注意：
+         *
+         * 只有在最后才删除。
+         *
+         * “第2季”不会被删除。
+         * “第二季”不会被删除。
+         * -----------------------------------------------------
+         */
+
+        title =
+                title.replaceFirst(
+                        "\\s*第\\s*\\d+\\s*[集]\\s*$",
+                        ""
+                );
+
+        /*
+         * 最后再次清理空格
+         */
+
+        title =
+                title.replaceAll(
+                        "\\s+",
+                        " "
+                ).trim();
+
+        return title;
     }
 
     // =========================================================
@@ -395,38 +653,26 @@ public class MainActivity extends Activity {
         for (SearchItem item : results) {
 
             Button button =
-                    new Button(this);
-
-            button.setText(item.title);
-
-            button.setTextSize(17);
-
-            button.setGravity(Gravity.CENTER_VERTICAL);
-
-            LinearLayout.LayoutParams params =
-                    new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    createButton(
+                            item.title
                     );
 
-            params.setMargins(0, 6, 0, 6);
-
             resultLayout.addView(
-                    button,
-                    params
+                    button
             );
 
-            button.setOnClickListener(v ->
-                    loadDetail(item)
+            button.setOnClickListener(
+                    v -> loadDetail(item)
             );
         }
     }
 
     // =========================================================
-    // 获取详情页
+    // 读取详情页
     // =========================================================
 
-    private void loadDetail(SearchItem item) {
+    private void loadDetail(
+            SearchItem item) {
 
         statusText.setText(
                 "正在读取：" +
@@ -444,9 +690,7 @@ public class MainActivity extends Activity {
 
                 List<Episode> episodes =
                         parseEpisodes(
-                                html,
-                                item.title,
-                                item.url
+                                html
                         );
 
                 mainHandler.post(() -> {
@@ -454,16 +698,20 @@ public class MainActivity extends Activity {
                     if (episodes.isEmpty()) {
 
                         statusText.setText(
-                                "没有解析到集数"
+                                "没有解析到 M3U8 集数"
                         );
 
                         Button back =
-                                createButton("← 返回搜索结果");
+                                createButton(
+                                        "← 返回搜索结果"
+                                );
 
-                        resultLayout.addView(back);
+                        resultLayout.addView(
+                                back
+                        );
 
-                        back.setOnClickListener(v ->
-                                showSearchResults(
+                        back.setOnClickListener(
+                                v -> showSearchResults(
                                         searchItems
                                 )
                         );
@@ -486,12 +734,28 @@ public class MainActivity extends Activity {
 
             } catch (Exception e) {
 
-                mainHandler.post(() ->
-                        statusText.setText(
-                                "读取详情失败：" +
-                                e.getMessage()
-                        )
-                );
+                mainHandler.post(() -> {
+
+                    statusText.setText(
+                            "读取详情失败：" +
+                            safeError(e)
+                    );
+
+                    Button back =
+                            createButton(
+                                    "← 返回搜索结果"
+                            );
+
+                    resultLayout.addView(
+                            back
+                    );
+
+                    back.setOnClickListener(
+                            v -> showSearchResults(
+                                    searchItems
+                            )
+                    );
+                });
             }
 
         }).start();
@@ -502,25 +766,34 @@ public class MainActivity extends Activity {
     // =========================================================
 
     private List<Episode> parseEpisodes(
-            String html,
-            String title,
-            String detailUrl) {
+            String html) {
 
         Map<String, Episode> map =
                 new LinkedHashMap<>();
 
         /*
-         * 第一优先级：
+         * =====================================================
+         * 第一优先级
          *
-         * copy_dyttm3u8[]="第1集#URL"
+         * 精确读取：
+         *
+         * <input
+         * name="copy_dyttm3u8[]"
+         * value="第1集#https://xxx/index.m3u8">
+         *
+         * =====================================================
          */
 
-        Pattern p1 = Pattern.compile(
-                "name\\s*=\\s*[\"']copy_dyttm3u8\\[\\][\"']" +
-                "[^>]*value\\s*=\\s*[\"']([^\"']+)[\"']",
-                Pattern.CASE_INSENSITIVE |
-                        Pattern.DOTALL
-        );
+        Pattern p1 =
+                Pattern.compile(
+                        "<input\\b[^>]*" +
+                        "name\\s*=\\s*[\"']copy_dyttm3u8\\[\\][\"']" +
+                        "[^>]*" +
+                        "value\\s*=\\s*[\"']([^\"']+)[\"']" +
+                        "[^>]*>",
+                        Pattern.CASE_INSENSITIVE |
+                                Pattern.DOTALL
+                );
 
         Matcher m1 =
                 p1.matcher(html);
@@ -528,7 +801,7 @@ public class MainActivity extends Activity {
         while (m1.find()) {
 
             String value =
-                    decodeHtml(m1.group(1));
+                    m1.group(1);
 
             parseEpisodeValue(
                     value,
@@ -537,23 +810,23 @@ public class MainActivity extends Activity {
         }
 
         /*
-         * 有些页面属性顺序反过来：
+         * =====================================================
+         * 第二种属性顺序
          *
-         * value="第1集#URL"
-         * name="copy_dyttm3u8[]"
+         * value 在 name 前面
+         * =====================================================
          */
 
-        Pattern p2 = Pattern.compile(
-                "<input[^>]*" +
-                "(?:value\\s*=\\s*[\"']([^\"']+)[\"'][^>]*" +
-                "name\\s*=\\s*[\"']copy_dyttm3u8\\[\\][\"']" +
-                "|" +
-                "name\\s*=\\s*[\"']copy_dyttm3u8\\[\\][\"'][^>]*" +
-                "value\\s*=\\s*[\"']([^\"']+)[\"'])" +
-                "[^>]*>",
-                Pattern.CASE_INSENSITIVE |
-                        Pattern.DOTALL
-        );
+        Pattern p2 =
+                Pattern.compile(
+                        "<input\\b[^>]*" +
+                        "value\\s*=\\s*[\"']([^\"']+)[\"']" +
+                        "[^>]*" +
+                        "name\\s*=\\s*[\"']copy_dyttm3u8\\[\\][\"']" +
+                        "[^>]*>",
+                        Pattern.CASE_INSENSITIVE |
+                                Pattern.DOTALL
+                );
 
         Matcher m2 =
                 p2.matcher(html);
@@ -563,36 +836,33 @@ public class MainActivity extends Activity {
             String value =
                     m2.group(1);
 
-            if (value == null) {
-                value = m2.group(2);
-            }
-
-            if (value == null) {
-                continue;
-            }
-
             parseEpisodeValue(
-                    decodeHtml(value),
+                    value,
                     map
             );
         }
 
         /*
-         * 第二备用：
+         * =====================================================
+         * 第三优先级
          *
-         * 直接找：
+         * 有些页面可能不是标准 input，
+         * 但源码里面依然存在：
          *
          * 第1集#https://xxx.m3u8
+         *
+         * =====================================================
          */
 
         if (map.isEmpty()) {
 
-            Pattern p3 = Pattern.compile(
-                    "(第\\s*\\d+\\s*集)" +
-                    "\\s*#\\s*" +
-                    "(https?://[^\"'\\s<>]+\\.m3u8[^\"'\\s<>]*)",
-                    Pattern.CASE_INSENSITIVE
-            );
+            Pattern p3 =
+                    Pattern.compile(
+                            "(第\\s*0*([0-9]+)\\s*集)" +
+                            "\\s*#\\s*" +
+                            "(https?://[^\"'\\s<>]+?\\.m3u8(?:\\?[^\"'\\s<>]*)?)",
+                            Pattern.CASE_INSENSITIVE
+                    );
 
             Matcher m3 =
                     p3.matcher(
@@ -605,7 +875,7 @@ public class MainActivity extends Activity {
                         m3.group(1);
 
                 String url =
-                        cleanUrl(m3.group(2));
+                        m3.group(3);
 
                 addEpisode(
                         map,
@@ -616,20 +886,27 @@ public class MainActivity extends Activity {
         }
 
         /*
-         * 第三备用：
+         * =====================================================
+         * 第四优先级
          *
-         * 找页面中的 m3u8，
-         * 但必须尝试从附近文字判断集数。
+         * 如果源码结构发生变化：
+         *
+         * 第X集
+         * ...
+         * https://xxx.m3u8
+         *
+         * =====================================================
          */
 
         if (map.isEmpty()) {
 
-            Pattern p4 = Pattern.compile(
-                    "(第\\s*0*([0-9]+)\\s*集)" +
-                    "[^\\r\\n]{0,500}?" +
-                    "(https?://[^\"'\\s<>]+\\.m3u8[^\"'\\s<>]*)",
-                    Pattern.CASE_INSENSITIVE
-            );
+            Pattern p4 =
+                    Pattern.compile(
+                            "(第\\s*0*([0-9]+)\\s*集)" +
+                            "[\\s\\S]{0,800}?" +
+                            "(https?://[^\"'\\s<>]+?\\.m3u8(?:\\?[^\"'\\s<>]*)?)",
+                            Pattern.CASE_INSENSITIVE
+                    );
 
             Matcher m4 =
                     p4.matcher(
@@ -638,34 +915,46 @@ public class MainActivity extends Activity {
 
             while (m4.find()) {
 
-                String ep =
+                String epName =
                         m4.group(1);
 
                 String url =
-                        cleanUrl(m4.group(3));
+                        m4.group(3);
 
                 addEpisode(
                         map,
-                        ep,
+                        epName,
                         url
                 );
             }
         }
+
+        /*
+         * =====================================================
+         * 按集数数字排序
+         * =====================================================
+         */
 
         List<Episode> list =
                 new ArrayList<>(
                         map.values()
                 );
 
-        /*
-         * 按集数数字排序
-         */
-
         Collections.sort(
                 list,
-                Comparator.comparingInt(
-                        e -> e.number
-                )
+                new Comparator<Episode>() {
+
+                    @Override
+                    public int compare(
+                            Episode a,
+                            Episode b) {
+
+                        return Integer.compare(
+                                a.number,
+                                b.number
+                        );
+                    }
+                }
         );
 
         return list;
@@ -673,7 +962,9 @@ public class MainActivity extends Activity {
 
     // =========================================================
     // 解析：
+    //
     // 第1集#URL
+    //
     // =========================================================
 
     private void parseEpisodeValue(
@@ -684,7 +975,14 @@ public class MainActivity extends Activity {
             return;
         }
 
-        value = value.trim();
+        value =
+                decodeHtml(
+                        value
+                ).trim();
+
+        /*
+         * 找第一个 #
+         */
 
         int index =
                 value.indexOf("#");
@@ -693,7 +991,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        String epName =
+        String episodeName =
                 value.substring(
                         0,
                         index
@@ -704,7 +1002,8 @@ public class MainActivity extends Activity {
                         index + 1
                 ).trim();
 
-        url = cleanUrl(url);
+        url =
+                cleanUrl(url);
 
         if (!isM3u8(url)) {
             return;
@@ -712,7 +1011,7 @@ public class MainActivity extends Activity {
 
         addEpisode(
                 map,
-                epName,
+                episodeName,
                 url
         );
     }
@@ -723,14 +1022,47 @@ public class MainActivity extends Activity {
 
     private void addEpisode(
             Map<String, Episode> map,
-            String epName,
+            String episodeName,
             String url) {
 
-        Matcher matcher =
+        if (episodeName == null ||
+                url == null) {
+
+            return;
+        }
+
+        episodeName =
+                decodeHtml(
+                        episodeName
+                ).trim();
+
+        url =
+                cleanUrl(url);
+
+        if (!isM3u8(url)) {
+            return;
+        }
+
+        /*
+         * 支持：
+         *
+         * 第1集
+         * 第01集
+         * 第001集
+         * 1集
+         * 01集
+         */
+
+        Pattern episodePattern =
                 Pattern.compile(
-                        "(?:第\\s*)?0*([0-9]+)(?:\\s*集)?",
+                        "(?:第\\s*)?0*([0-9]+)\\s*集",
                         Pattern.CASE_INSENSITIVE
-                ).matcher(epName);
+                );
+
+        Matcher matcher =
+                episodePattern.matcher(
+                        episodeName
+                );
 
         if (!matcher.find()) {
             return;
@@ -746,8 +1078,20 @@ public class MainActivity extends Activity {
                     );
 
         } catch (Exception e) {
+
             return;
         }
+
+        if (number <= 0) {
+            return;
+        }
+
+        /*
+         * 用集数作为唯一键。
+         *
+         * 如果页面重复出现第1集，
+         * 只保留第一条。
+         */
 
         String key =
                 String.valueOf(number);
@@ -759,13 +1103,16 @@ public class MainActivity extends Activity {
         Episode episode =
                 new Episode();
 
-        episode.number = number;
+        episode.number =
+                number;
+
         episode.name =
                 "第" +
                 number +
                 "集";
 
-        episode.url = url;
+        episode.url =
+                url;
 
         map.put(
                 key,
@@ -783,6 +1130,12 @@ public class MainActivity extends Activity {
 
         resultLayout.removeAllViews();
 
+        /*
+         * -----------------------------------------------------
+         * 全部复制
+         * -----------------------------------------------------
+         */
+
         Button allButton =
                 createButton(
                         "复制全部 " +
@@ -790,72 +1143,123 @@ public class MainActivity extends Activity {
                         " 集"
                 );
 
-        resultLayout.addView(allButton);
+        resultLayout.addView(
+                allButton
+        );
 
-        allButton.setOnClickListener(v -> {
+        allButton.setOnClickListener(
+                v -> {
 
-            StringBuilder sb =
-                    new StringBuilder();
+                    StringBuilder sb =
+                            new StringBuilder();
 
-            for (Episode e : episodes) {
+                    for (Episode episode :
+                            episodes) {
 
-                sb.append(e.url)
-                        .append("#")
-                        .append(title)
-                        .append(e.name)
-                        .append("\n");
-            }
+                        sb.append(
+                                episode.url
+                        );
 
-            copyToClipboard(
-                    sb.toString().trim()
-            );
+                        sb.append("#");
 
-            Toast.makeText(
-                    this,
-                    "已复制全部集数",
-                    Toast.LENGTH_SHORT
-            ).show();
-        });
+                        sb.append(
+                                title
+                        );
 
-        Button back =
+                        sb.append(
+                                episode.name
+                        );
+
+                        sb.append("\n");
+                    }
+
+                    String result =
+                            sb.toString().trim();
+
+                    copyToClipboard(
+                            result
+                    );
+
+                    Toast.makeText(
+                            MainActivity.this,
+                            "已复制全部 " +
+                            episodes.size() +
+                            " 集",
+                            Toast.LENGTH_SHORT
+                    ).show();
+                }
+        );
+
+        /*
+         * -----------------------------------------------------
+         * 返回
+         * -----------------------------------------------------
+         */
+
+        Button backButton =
                 createButton(
                         "← 返回影片列表"
                 );
 
-        resultLayout.addView(back);
+        resultLayout.addView(
+                backButton
+        );
 
-        back.setOnClickListener(v ->
-                showSearchResults(
+        backButton.setOnClickListener(
+                v -> showSearchResults(
                         searchItems
                 )
         );
 
-        for (Episode episode : episodes) {
+        /*
+         * -----------------------------------------------------
+         * 单集
+         * -----------------------------------------------------
+         */
+
+        for (Episode episode :
+                episodes) {
 
             Button button =
                     createButton(
                             episode.name
                     );
 
-            resultLayout.addView(button);
+            resultLayout.addView(
+                    button
+            );
 
-            button.setOnClickListener(v -> {
+            button.setOnClickListener(
+                    v -> {
 
-                String result =
-                        episode.url +
-                        "#" +
-                        title +
-                        episode.name;
+                        /*
+                         * 最终格式：
+                         *
+                         * URL#搜索结果实际片名第1集
+                         *
+                         * 例如：
+                         *
+                         * https://xxx/index.m3u8#交锋2026第1集
+                         */
 
-                copyToClipboard(result);
+                        String result =
+                                episode.url +
+                                "#" +
+                                title +
+                                episode.name;
 
-                Toast.makeText(
-                        this,
-                        "已复制：" +
-                        episode.name,
-                        Toast.LENGTH_SHORT
-                ).show();
-            });
+                        copyToClipboard(
+                                result
+                        );
+
+                        Toast.makeText(
+                                MainActivity.this,
+                                "已复制：" +
+                                episode.name,
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+            );
         }
     }
 
@@ -863,96 +1267,141 @@ public class MainActivity extends Activity {
     // 网络请求
     // =========================================================
 
-    private String get(String urlString)
+    private String get(
+            String urlString)
             throws Exception {
 
-        HttpURLConnection conn = null;
+        HttpURLConnection connection =
+                null;
 
         try {
 
             URL url =
                     new URL(urlString);
 
-            conn =
+            connection =
                     (HttpURLConnection)
                             url.openConnection();
 
-            conn.setRequestMethod("GET");
-
-            conn.setConnectTimeout(15000);
-
-            conn.setReadTimeout(20000);
-
-            conn.setInstanceFollowRedirects(true);
-
-            conn.setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Linux; Android 13) " +
-                    "AppleWebKit/537.36 " +
-                    "Chrome/120.0 Mobile Safari/537.36"
+            connection.setRequestMethod(
+                    "GET"
             );
 
-            conn.setRequestProperty(
+            connection.setConnectTimeout(
+                    15000
+            );
+
+            connection.setReadTimeout(
+                    20000
+            );
+
+            connection.setInstanceFollowRedirects(
+                    true
+            );
+
+            /*
+             * 模拟手机浏览器
+             */
+
+            connection.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 " +
+                    "(Linux; Android 13) " +
+                    "AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 " +
+                    "Mobile Safari/537.36"
+            );
+
+            connection.setRequestProperty(
                     "Accept",
                     "text/html,application/xhtml+xml," +
-                    "application/xml;q=0.9,*/*;q=0.8"
+                    "application/xml;q=0.9," +
+                    "*/*;q=0.8"
             );
 
-            conn.setRequestProperty(
+            connection.setRequestProperty(
                     "Accept-Language",
                     "zh-CN,zh;q=0.9"
             );
 
-            int code =
-                    conn.getResponseCode();
+            connection.setRequestProperty(
+                    "Connection",
+                    "keep-alive"
+            );
 
-            InputStream input;
+            int responseCode =
+                    connection.getResponseCode();
 
-            if (code >= 400) {
-                input = conn.getErrorStream();
+            InputStream inputStream;
+
+            if (responseCode >= 400) {
+
+                inputStream =
+                        connection.getErrorStream();
+
             } else {
-                input = conn.getInputStream();
+
+                inputStream =
+                        connection.getInputStream();
             }
 
-            if (input == null) {
+            if (inputStream == null) {
+
                 throw new Exception(
-                        "HTTP " + code
+                        "HTTP " +
+                        responseCode
                 );
             }
 
+            /*
+             * 获取网页字符集
+             */
+
             String charset =
                     getCharset(
-                            conn.getContentType()
+                            connection.getContentType()
                     );
 
             BufferedReader reader =
                     new BufferedReader(
                             new InputStreamReader(
-                                    input,
-                                    charset
+                                    inputStream,
+                                    Charset.forName(
+                                            charset
+                                    )
                             )
                     );
 
-            StringBuilder sb =
+            StringBuilder result =
                     new StringBuilder();
 
             String line;
 
-            while ((line =
-                    reader.readLine()) != null) {
+            while (
+                    (line =
+                            reader.readLine())
+                            != null
+            ) {
 
-                sb.append(line)
-                        .append("\n");
+                result.append(
+                        line
+                );
+
+                result.append(
+                        "\n"
+                );
             }
 
             reader.close();
 
-            return sb.toString();
+            return result.toString();
 
         } finally {
 
-            if (conn != null) {
-                conn.disconnect();
+            if (connection != null) {
+
+                connection.disconnect();
             }
         }
     }
@@ -970,20 +1419,39 @@ public class MainActivity extends Activity {
                     Pattern.compile(
                             "charset\\s*=\\s*([^;\\s]+)",
                             Pattern.CASE_INSENSITIVE
-                    ).matcher(contentType);
+                    ).matcher(
+                            contentType
+                    );
 
             if (matcher.find()) {
 
-                return matcher.group(1)
-                        .trim();
+                String charset =
+                        matcher.group(1)
+                                .trim();
+
+                try {
+
+                    Charset.forName(
+                            charset
+                    );
+
+                    return charset;
+
+                } catch (Exception ignored) {
+                }
             }
         }
+
+        /*
+         * 这个站如果没有明确返回 charset，
+         * 优先 UTF-8。
+         */
 
         return "UTF-8";
     }
 
     // =========================================================
-    // HTML文字
+    // HTML → 纯文字
     // =========================================================
 
     private String extractText(
@@ -994,16 +1462,31 @@ public class MainActivity extends Activity {
         }
 
         String text =
-                html.replaceAll(
-                        "<script[\\s\\S]*?</script>",
-                        ""
-                );
+                html;
+
+        /*
+         * 删除 script
+         */
 
         text =
                 text.replaceAll(
-                        "<style[\\s\\S]*?</style>",
-                        ""
+                        "(?is)<script[^>]*>.*?</script>",
+                        " "
                 );
+
+        /*
+         * 删除 style
+         */
+
+        text =
+                text.replaceAll(
+                        "(?is)<style[^>]*>.*?</style>",
+                        " "
+                );
+
+        /*
+         * 删除 HTML 标签
+         */
 
         text =
                 text.replaceAll(
@@ -1011,10 +1494,18 @@ public class MainActivity extends Activity {
                         " "
                 );
 
+        /*
+         * HTML 实体
+         */
+
         text =
-                Html.fromHtml(
+                decodeHtml(
                         text
-                ).toString();
+                );
+
+        /*
+         * nbsp
+         */
 
         text =
                 text.replace(
@@ -1022,13 +1513,22 @@ public class MainActivity extends Activity {
                         " "
                 );
 
-        return text
-                .replaceAll(
+        /*
+         * 合并空白
+         */
+
+        text =
+                text.replaceAll(
                         "\\s+",
                         " "
-                )
-                .trim();
+                ).trim();
+
+        return text;
     }
+
+    // =========================================================
+    // HTML 实体解码
+    // =========================================================
 
     private String decodeHtml(
             String value) {
@@ -1038,35 +1538,75 @@ public class MainActivity extends Activity {
         }
 
         return Html.fromHtml(
-                value
+                value,
+                Html.FROM_HTML_MODE_LEGACY
         ).toString();
     }
 
     // =========================================================
-    // URL处理
+    // URL 转绝对地址
     // =========================================================
 
     private String makeAbsoluteUrl(
             String url) {
 
-        if (url.startsWith("http://") ||
-                url.startsWith("https://")) {
+        if (url == null ||
+                url.isEmpty()) {
+
+            return "";
+        }
+
+        url =
+                decodeHtml(
+                        url
+                ).trim();
+
+        /*
+         * 已经是完整 URL
+         */
+
+        if (url.startsWith(
+                "http://"
+        ) ||
+                url.startsWith(
+                        "https://"
+                )) {
 
             return url;
         }
 
-        if (url.startsWith("//")) {
+        /*
+         * //example.com
+         */
+
+        if (url.startsWith(
+                "//"
+        )) {
 
             return "https:" + url;
         }
 
-        if (url.startsWith("/")) {
+        /*
+         * /index.php/...
+         */
+
+        if (url.startsWith(
+                "/"
+        )) {
 
             return BASE_URL + url;
         }
 
+        /*
+         * 相对地址
+         */
+
         return BASE_URL + "/" + url;
     }
+
+    // =========================================================
+    // 清理 URL
+    // =========================================================
 
     private String cleanUrl(
             String url) {
@@ -1076,10 +1616,13 @@ public class MainActivity extends Activity {
         }
 
         url =
-                Html.fromHtml(
+                decodeHtml(
                         url
-                ).toString()
-                        .trim();
+                ).trim();
+
+        /*
+         * &amp;
+         */
 
         url =
                 url.replace(
@@ -1088,28 +1631,52 @@ public class MainActivity extends Activity {
                 );
 
         /*
-         * 去掉末尾 HTML 标记
+         * 去掉首尾引号
          */
 
         url =
                 url.replaceAll(
-                        "[\"'<>\\s]+$",
+                        "^[\"']+",
                         ""
                 );
 
-        return url;
+        url =
+                url.replaceAll(
+                        "[\"']+$",
+                        ""
+                );
+
+        /*
+         * 去掉 HTML 尾部符号
+         */
+
+        url =
+                url.replaceAll(
+                        "[<>\\s]+$",
+                        ""
+                );
+
+        return url.trim();
     }
+
+    // =========================================================
+    // 判断 M3U8
+    // =========================================================
 
     private boolean isM3u8(
             String url) {
 
-        return url != null &&
-                url.toLowerCase()
-                        .contains(".m3u8");
+        if (url == null) {
+            return false;
+        }
+
+        return url
+                .toLowerCase()
+                .contains(".m3u8");
     }
 
     // =========================================================
-    // Button
+    // 创建按钮
     // =========================================================
 
     private Button createButton(
@@ -1118,9 +1685,13 @@ public class MainActivity extends Activity {
         Button button =
                 new Button(this);
 
-        button.setText(text);
+        button.setText(
+                text
+        );
 
-        button.setTextSize(16);
+        button.setTextSize(
+                16
+        );
 
         button.setGravity(
                 Gravity.CENTER_VERTICAL
@@ -1139,47 +1710,90 @@ public class MainActivity extends Activity {
                 6
         );
 
-        button.setLayoutParams(params);
+        button.setLayoutParams(
+                params
+        );
 
         return button;
     }
 
     // =========================================================
-    // 剪贴板
+    // 复制到剪贴板
     // =========================================================
 
     private void copyToClipboard(
             String text) {
 
-        android.content.ClipboardManager clipboard =
-                (android.content.ClipboardManager)
+        ClipboardManager clipboard =
+                (ClipboardManager)
                         getSystemService(
-                                CLIPBOARD_SERVICE
+                                Context.CLIPBOARD_SERVICE
                         );
 
-        android.content.ClipData clip =
-                android.content.ClipData.newPlainText(
+        ClipData clip =
+                ClipData.newPlainText(
                         "M3U8",
                         text
                 );
 
-        clipboard.setPrimaryClip(clip);
+        clipboard.setPrimaryClip(
+                clip
+        );
     }
 
     // =========================================================
-    // 数据类
+    // 错误信息
+    // =========================================================
+
+    private String safeError(
+            Exception e) {
+
+        if (e == null) {
+            return "未知错误";
+        }
+
+        String message =
+                e.getMessage();
+
+        if (message == null ||
+                message.trim().isEmpty()) {
+
+            return e.getClass()
+                    .getSimpleName();
+        }
+
+        return message;
+    }
+
+    // =========================================================
+    // 搜索结果对象
     // =========================================================
 
     private static class SearchItem {
 
+        // 最终使用的干净名称
         String title;
+
+        // 网站原始显示名称
+        String originalTitle;
+
+        // 详情页地址
         String url;
     }
 
+    // =========================================================
+    // 集数对象
+    // =========================================================
+
     private static class Episode {
 
+        // 集数数字
         int number;
+
+        // 显示名称，例如：第1集
         String name;
+
+        // M3U8 地址
         String url;
     }
 }
